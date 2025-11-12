@@ -1,0 +1,19 @@
+/* Footer custom styles for Tailwind CSS */
+
+/* Subtle animations for footer links */
+.footer-link {
+  transition: all 0.2s ease-in-out;
+}
+
+.footer-link:hover {
+  transform: translateY(-1px);
+}
+
+/* Badge animations */
+.tech-badge {
+  transition: all 0.2s ease-in-out;
+}
+
+.tech-badge:hover {
+  transform: scale(1.05);
+}
