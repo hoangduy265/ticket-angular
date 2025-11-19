@@ -1,7 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, OnInit, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ChangePasswordComponent } from './components/change-password/change-password.component';
-import { ToastComponent } from './components/toast.component/toast.component';
+import { ToastComponent } from './components/toast/toast.component/toast.component';
+import { FirebaseFCMService } from './services/firebase/firebase-fcm.service';
 
 @Component({
   selector: 'app-root',
@@ -9,6 +10,22 @@ import { ToastComponent } from './components/toast.component/toast.component';
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App {
+export class App implements OnInit {
   protected readonly title = signal('ticket');
+
+  private fcmService = inject(FirebaseFCMService);
+
+  ngOnInit(): void {
+    // Khởi tạo Firebase FCM khi ứng dụng bắt đầu
+    this.initializeFCM();
+  }
+
+  private async initializeFCM(): Promise<void> {
+    try {
+      // Khởi tạo Firebase FCM với config từ service
+      await this.fcmService.initialize();
+    } catch (error) {
+      console.error('Lỗi khởi tạo FCM:', error);
+    }
+  }
 }

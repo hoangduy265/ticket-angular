@@ -1,81 +1,93 @@
-import { Injectable } from '@angular/core';
+import { inject } from '@angular/core';
 import {
-  HttpInterceptor,
   HttpRequest,
-  HttpHandler,
+  HttpHandlerFn,
   HttpEvent,
   HttpErrorResponse,
+  HttpInterceptorFn,
 } from '@angular/common/http';
 import { Observable, throwError, BehaviorSubject } from 'rxjs';
 import { catchError, switchMap, filter, take } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
 import { Router } from '@angular/router';
 
-@Injectable()
-export class AuthInterceptor implements HttpInterceptor {
-  private isRefreshing = false;
-  private refreshTokenSubject: BehaviorSubject<any> = new BehaviorSubject<any>(null);
+// State để quản lý refresh token process
+let isRefreshing = false;
+let refreshTokenSubject = new BehaviorSubject<string | null>(null);
 
-  constructor(private authService: AuthService, private router: Router) {}
+/**
+ * Functional HTTP Interceptor cho authentication
+ */
+export const authInterceptor: HttpInterceptorFn = (
+  req: HttpRequest<unknown>,
+  next: HttpHandlerFn
+): Observable<HttpEvent<unknown>> => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
 
-  intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    // Thêm token vào request nếu có
-    const token = this.authService.getToken();
-    if (token) {
-      request = this.addToken(request, token);
-    }
+  // Thêm token vào request nếu có
+  const token = authService.getToken();
+  if (token) {
+    req = addToken(req, token);
+  }
 
-    return next.handle(request).pipe(
-      catchError((error: HttpErrorResponse) => {
-        if (error.status === 401) {
-          return this.handle401Error(request, next);
-        }
-        return throwError(() => error);
+  return next(req).pipe(
+    catchError((error: HttpErrorResponse) => {
+      if (error.status === 401) {
+        return handle401Error(req, next, authService, router);
+      }
+      return throwError(() => error);
+    })
+  );
+};
+
+/**
+ * Thêm Authorization header vào request
+ */
+function addToken(request: HttpRequest<unknown>, token: string): HttpRequest<unknown> {
+  return request.clone({
+    setHeaders: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+/**
+ * Xử lý lỗi 401 Unauthorized
+ */
+function handle401Error(
+  request: HttpRequest<unknown>,
+  next: HttpHandlerFn,
+  authService: AuthService,
+  router: Router
+): Observable<HttpEvent<unknown>> {
+  if (!isRefreshing) {
+    isRefreshing = true;
+    refreshTokenSubject.next(null);
+
+    return authService.refreshToken().pipe(
+      switchMap((response: any) => {
+        isRefreshing = false;
+        const newToken = response.token;
+        refreshTokenSubject.next(newToken);
+        return next(addToken(request, newToken));
+      }),
+      catchError((err) => {
+        isRefreshing = false;
+        refreshTokenSubject.next(null);
+        authService.logout();
+        router.navigate(['/login']);
+        return throwError(() => err);
+      })
+    );
+  } else {
+    // Đợi refresh token hoàn thành
+    return refreshTokenSubject.pipe(
+      filter((token) => token != null),
+      take(1),
+      switchMap((token) => {
+        return next(addToken(request, token!));
       })
     );
   }
-
-  private addToken(request: HttpRequest<any>, token: string): HttpRequest<any> {
-    return request.clone({
-      setHeaders: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  }
-
-  private handle401Error(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    if (!this.isRefreshing) {
-      this.isRefreshing = true;
-      this.refreshTokenSubject.next(null);
-
-      return this.authService.refreshToken().pipe(
-        switchMap((token: any) => {
-          this.isRefreshing = false;
-          this.refreshTokenSubject.next(token.token);
-          return next.handle(this.addToken(request, token.token));
-        }),
-        catchError((err) => {
-          this.isRefreshing = false;
-          this.refreshTokenSubject.next(null);
-          this.authService.logout();
-          this.router.navigate(['/login']);
-          return throwError(() => err);
-        })
-      );
-    } else {
-      return this.refreshTokenSubject.pipe(
-        filter((token) => token != null),
-        take(1),
-        switchMap((token) => {
-          return next.handle(this.addToken(request, token));
-        })
-      );
-    }
-  }
-}
-
-export function authInterceptor(req: any, next: any) {
-  // This is a simplified version. In production, you'd use proper DI
-  // For now, we'll skip the interceptor functionality
-  return next(req);
 }

@@ -1,0 +1,289 @@
+<app-modal [isOpen]="isOpen" title="Chi tiết Ticket" size="lg" (closed)="onClose()" *ngIf="isOpen">
+  <div *ngIf="ticket" class="max-h-[80vh] overflow-y-auto -mx-2 px-2">
+    <!-- Ticket Header - Compact -->
+    <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-4 mb-4">
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                  [ngClass]="getStatusClass(ticket.status)">
+              {{ getStatusLabel(ticket.status) }}
+            </span>
+            <span class="text-xs text-gray-500">ID: #{{ ticket.id }}</span>
+          </div>
+          <h3 class="text-lg sm:text-xl font-bold text-gray-900 m-0 leading-tight break-words">{{ ticket.title }}</h3>
+          <p class="text-xs text-gray-500 mt-1">
+            <svg class="w-3 h-3 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            {{ formatDate(ticket.createdAt) }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content - Single Column on Mobile, Optimized Layout -->
+    <div class="space-y-4">
+      <!-- Description - Full Width -->
+      <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+        <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+          <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <h4 class="text-sm font-semibold text-gray-700 m-0">Mô tả chi tiết</h4>
+        </div>
+        <div class="text-gray-600 text-sm">
+          <p class="leading-relaxed m-0 whitespace-pre-wrap">{{ ticket.description }}</p>
+        </div>
+      </div>
+
+      <!-- Type and Note Section - Grid layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Type -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+            <h4 class="text-sm font-semibold text-gray-700 m-0">Loại ticket</h4>
+          </div>
+          <div class="text-sm">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+              {{ getTypeLabel(ticket.type) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Note -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm" *ngIf="ticket.note">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            <h4 class="text-sm font-semibold text-gray-700 m-0">Ghi chú</h4>
+          </div>
+          <div class="text-gray-600 text-sm">
+            <p class="leading-relaxed m-0 whitespace-pre-wrap">{{ ticket.note }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Images Section - Full Width if has images -->
+      <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm" *ngIf="ticketImages.length > 0 || isLoadingImages">
+        <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+          <svg class="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <h4 class="text-sm font-semibold text-gray-700 m-0">Ảnh đính kèm</h4>
+          <span class="text-xs text-gray-500">({{ ticketImages.length }})</span>
+        </div>
+        
+        <!-- Loading state -->
+        <div *ngIf="isLoadingImages" class="text-center py-6">
+          <div class="inline-block w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p class="mt-2 text-xs text-gray-500">Đang tải ảnh...</p>
+        </div>
+
+        <!-- Images Grid - Responsive -->
+        <div *ngIf="!isLoadingImages && ticketImages.length > 0" 
+          class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+          <div *ngFor="let image of ticketImages; let i = index" 
+            class="relative group aspect-square cursor-pointer"
+            (click)="openImagePreview(image)">
+            <img [src]="imgUrl + '/' + image.imageUrl" 
+              [alt]="'Ticket image ' + image.id"
+              class="w-full h-full object-cover rounded-lg border-2 border-gray-200 shadow-sm group-hover:border-blue-400 group-hover:shadow-md transition-all duration-200" />
+            
+            <!-- Zoom overlay -->
+            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 rounded-lg flex items-center justify-center pointer-events-none">
+              <svg class="w-6 h-6 sm:w-8 sm:h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+              </svg>
+            </div>
+            
+            <!-- Counter badge -->
+            <div class="absolute top-1 left-1 bg-black bg-opacity-70 text-white text-xs px-1.5 py-0.5 rounded pointer-events-none">
+              {{ i + 1 }}/{{ ticketImages.length }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Grid - 2 Columns on Desktop, Stack on Mobile -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <!-- Assignment Info -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+            <svg class="w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            </svg>
+            <h4 class="text-sm font-semibold text-gray-700 m-0">Thông tin xử lý</h4>
+          </div>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-0" *ngIf="ticket.processByName">
+              <span class="text-gray-500">Người xử lý:</span>
+              <span class="font-semibold text-gray-700">{{ ticket.processByName }}</span>
+            </div>
+            <div class="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-0" *ngIf="ticket.processBy">
+              <span class="text-gray-500">ID:</span>
+              <span class="font-semibold text-gray-700">{{ ticket.processBy }}</span>
+            </div>
+            <div class="flex justify-between items-center py-1.5" *ngIf="!ticket.processByName && !ticket.processBy">
+              <span class="text-gray-500 italic text-xs">Chưa có người xử lý</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Active Status -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+            <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h4 class="text-sm font-semibold text-gray-700 m-0">Trạng thái hoạt động</h4>
+          </div>
+          
+        </div>
+
+        <!-- Timeline -->
+        <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+          <div class="flex items-center gap-2 mb-3 pb-2 border-b border-gray-100">
+            <svg class="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h4 class="text-sm font-semibold text-gray-700 m-0">Lịch sử</h4>
+          </div>
+          <div class="space-y-3">
+            <!-- Created -->
+            <div class="flex gap-3">
+              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                <div class="w-2 h-2 rounded-full bg-blue-500"></div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-700 m-0">Ticket được tạo</p>
+                <p class="text-xs text-gray-500 mt-0.5">{{ formatDate(ticket.createdAt) }}</p>
+              </div>
+            </div>
+
+            <!-- Closed -->
+            <div class="flex gap-3" *ngIf="ticket.closedAt">
+              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                <div class="w-2 h-2 rounded-full bg-green-500"></div>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-700 m-0">Ticket được đóng</p>
+                <p class="text-xs text-gray-500 mt-0.5">{{ formatDate(ticket.closedAt) }}</p>
+              </div>
+            </div>
+
+            <!-- Rated -->
+            <div class="flex gap-3" *ngIf="ticket.rate">
+              <div class="flex-shrink-0 w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
+                <svg class="w-3 h-3 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-700 m-0">
+                  Đánh giá: <span class="text-yellow-500">{{ getRatingStars(ticket.rate) }}</span>
+                </p>
+                <p class="text-xs text-gray-500 mt-0.5" *ngIf="ticket.rateAt">{{ formatDate(ticket.rateAt) }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rating Section - Full Width -->
+      <div class="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg p-4 shadow-sm" *ngIf="canRate()">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div class="flex-1">
+            <h4 class="text-sm font-semibold text-gray-800 m-0 mb-1">Đánh giá chất lượng</h4>
+            <p class="text-xs text-gray-600 m-0">Ticket đã hoàn thành. Hãy đánh giá để giúp chúng tôi cải thiện dịch vụ!</p>
+          </div>
+          <button
+            class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm font-medium inline-flex items-center justify-center gap-2 transition-colors shadow-sm"
+            (click)="onRate()">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+            Đánh giá ngay
+          </button>
+        </div>
+      </div>
+
+      <!-- Rating Display - Full Width -->
+      <div class="bg-white border border-yellow-200 rounded-lg p-4 shadow-sm" *ngIf="ticket.rate">
+        <div class="text-center">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-yellow-100 mb-3">
+            <svg class="w-8 h-8 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+          </div>
+          <div class="text-2xl text-yellow-400 font-medium mb-1">
+            {{ getRatingStars(ticket.rate) }}
+          </div>
+          <div class="text-sm">
+            <span class="font-semibold text-gray-700">{{ ticket.rate }}/5 sao</span>
+            <span class="text-gray-500" *ngIf="ticket.rateAt"> • {{ formatDate(ticket.rateAt) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Loading state -->
+  <div *ngIf="!ticket" class="text-center py-12">
+    <div class="inline-block w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <p class="mt-3 text-gray-600 text-sm">Đang tải thông tin ticket...</p>
+  </div>
+</app-modal>
+
+<!-- Image Preview Modal - Responsive Lightbox -->
+<div *ngIf="showImageModal && selectedImage" 
+  class="fixed inset-0 bg-black bg-opacity-90 z-[9999] flex items-center justify-center p-2 sm:p-4"
+  (click)="closeImagePreview()">
+  <div class="relative w-full h-full flex flex-col" (click)="$event.stopPropagation()">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-2 sm:mb-4">
+      <div class="text-white">
+        <p class="text-sm sm:text-base font-medium">Ticket #{{ ticket?.id }}</p>
+        <p class="text-xs text-gray-300">{{ selectedImage.createdAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+      </div>
+      <button 
+        (click)="closeImagePreview()"
+        class="text-white hover:text-gray-300 transition-colors p-2"
+        title="Đóng (ESC)">
+        <svg class="w-6 h-6 sm:w-8 sm:h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Image Container -->
+    <div class="flex-1 flex items-center justify-center min-h-0">
+      <img [src]="imgUrl + '/' + selectedImage.imageUrl" 
+        [alt]="'Image ' + selectedImage.id"
+        class="max-w-full max-h-full w-auto h-auto object-contain rounded-lg shadow-2xl" />
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="mt-2 sm:mt-4 flex justify-center gap-2 sm:gap-3">
+      <button 
+        (click)="downloadImage(selectedImage)"
+        class="px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs sm:text-sm rounded-lg transition-colors inline-flex items-center gap-2 shadow-lg">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+        <span class="hidden sm:inline">Mở trong tab mới</span>
+        <span class="sm:hidden">Xem</span>
+      </button>
+      <button 
+        (click)="closeImagePreview()"
+        class="px-3 sm:px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white text-xs sm:text-sm rounded-lg transition-colors shadow-lg">
+        Đóng
+      </button>
+    </div>
+  </div>
+</div>

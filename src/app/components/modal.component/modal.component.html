@@ -1,1 +1,20 @@
-<p>modal.component works!</p>
+<div class="modal-backdrop" [class.show]="isOpen" (click)="onBackdropClick($event)">
+  <div class="modal-container" [ngClass]="getSizeClass()" [class.show]="isOpen">
+    <!-- Modal Header -->
+    <div class="flex justify-between items-center p-4 border-b border-gray-200" *ngIf="title">
+      <h5 class="text-lg font-medium text-gray-900 m-0">{{ title }}</h5>
+      <button type="button"
+              class="bg-transparent border-none text-xl text-gray-400 cursor-pointer p-0 w-4 h-4 flex items-center justify-center hover:text-gray-600"
+              *ngIf="showCloseButton"
+              (click)="close()"
+              aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="p-4 overflow-y-auto flex-1">
+      <ng-content></ng-content>
+    </div>
+  </div>
+</div>

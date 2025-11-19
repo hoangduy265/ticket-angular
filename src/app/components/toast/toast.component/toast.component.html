@@ -1,0 +1,25 @@
+<!-- Toast Notifications Container - Góc trên bên phải -->
+<div class="toast-container">
+  <div
+    *ngFor="let toast of toasts"
+    class="toast show"
+    [ngClass]="getToastClasses(toast)"
+    role="alert"
+    aria-live="assertive"
+    aria-atomic="true">
+    <div class="toast-header">
+      <i [class]="getToastIcon(toast.type)" class="me-2"></i>
+      <strong class="me-auto">{{ getToastTitle(toast.type) }}</strong>
+      <button
+        type="button"
+        class="btn-close"
+        data-bs-dismiss="toast"
+        aria-label="Close"
+        (click)="removeToast(toast.id)">
+      </button>
+    </div>
+    <div class="toast-body">
+      {{ toast.message }}
+    </div>
+  </div>
+</div>

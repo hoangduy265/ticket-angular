@@ -1,0 +1,13 @@
+/* Chỉ giữ lại các style thực sự cần thiết mà Tailwind không cung cấp */
+/* Timeline marker với border và shadow */
+.timeline-marker {
+  border: 3px solid white;
+  box-shadow: 0 0 0 2px #e5e7eb;
+}
+
+/* Rating stars styling nếu cần custom */
+.stars {
+  color: #fbbf24;
+}
+
+/* Tất cả style khác đã được thay thế bằng Tailwind CSS classes */

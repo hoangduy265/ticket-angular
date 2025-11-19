@@ -2,7 +2,7 @@
 
 ## Tổng quan Dự án
 
-Đây là ứng dụng quản lý ticket dựa trên Angular được xây dựng với Angular 20.3.0. Ứng dụng cung cấp giao diện web để quản lý ticket, với xác thực, vai trò người dùng và các chức năng liên quan đến ticket khác nhau.
+Đây là ứng dụng quản lý ticket của người dùng dựa trên Angular được xây dựng với Angular 20.3.0. Ứng dụng cung cấp giao diện web để quản lý ticket, với xác thực, vai trò người dùng và các chức năng liên quan đến ticket khác nhau.
 
 ## Ngăn xếp Công nghệ
 
@@ -13,12 +13,21 @@
 - **Kiểm thử**: Jasmine, Karma
 - **Quản lý Gói**: npm
 
+## UI/UX
+
+- Giao diện người dùng được xây dựng dựa trên tailwindcss, cung cấp thiết kế responsive và các thành phần UI sẵn có.
+- Sử dụng các modal component để hiển thị chi tiết, chỉnh sửa và tạo mới ticket.
+- hạn chế viết CSS tùy chỉnh, tận dụng tối đa các lớp tiện ích của tailwindcss để duy trì tính nhất quán và dễ bảo trì.
+
 ## Cấu trúc Thư mục
 
 ```
 ticket-angular/
 ├── .angular/                 # Bộ nhớ cache build Angular
 ├── .github/                  # Cấu hình GitHub và hướng dẫn Copilot
+|   ├── api-documents/        # Tài liệu API cho Copilot tham khảo khi tạo mã
+|   ├── features-instructions/        # Mô tả và hướng dẫn cho Copilot xây dựng các tính năng riêng.
+|   └── copilot-instructions.md        # File hướng dẫn Copilot cho toàn bộ dự án
 ├── .vscode/                  # Cài đặt workspace VS Code
 ├── node_modules/             # Các dependencies
 ├── public/                   # Tài sản tĩnh
@@ -55,7 +64,7 @@ ticket-angular/
 │   ├── index.html            # File HTML chính
 │   ├── main.ts               # Bootstrap ứng dụng
 │   └── styles.css            # Styles toàn cục
-├── templates/                # Tài sản mẫu (AdminLTE)
+├── templates/                # Tài sản mẫu (tailwindcss)
 ├── angular.json              # Cấu hình Angular CLI
 ├── package.json              # Dependencies và scripts
 ├── tsconfig.json             # Cấu hình TypeScript
@@ -90,7 +99,9 @@ Xử lý đăng nhập, đăng xuất, quản lý token và trạng thái xác t
 
 ### Dịch vụ Ticket
 
-Quản lý các thao tác liên quan đến ticket (thao tác CRUD cho ticket).
+Quản lý các thao tác liên quan đến ticket (thao tác CRUD cho ticket) của user.
+Chỉ tải những ticket liên quan đến user đã đăng nhập.
+Chỉ được chỉnh sửa khi ticket có trạng thái là mới tạo (status = 0).
 
 ## Guards và Interceptors
 
@@ -154,3 +165,32 @@ Tự động thêm token xác thực vào các yêu cầu HTTP.
 - Xác thực được xử lý thông qua guards và interceptors
 - Tất cả yêu cầu HTTP được chặn để xác thực
 - Ứng dụng hỗ trợ thiết kế responsive thông qua AdminLTE
+
+## Bảo mật
+
+### Bảo mật Firebase trong ứng dụng Angular
+
+#### 1. **Firebase Config Security**
+
+##### ✅ Những gì AN TOÀN để public:
+
+- `apiKey`: Firebase API key (được thiết kế để public)
+- `authDomain`: Authentication domain
+- `projectId`: Firebase project ID
+- `messagingSenderId`: FCM sender ID
+- `appId`: Firebase app ID
+
+##### ❌ Những gì KHÔNG được expose:
+
+- `serviceAccountKey.json`: Chứa private keys
+- Database secrets
+- Storage secrets
+- Server-side API keys
+
+#### 2. **Vấn đề hiện tại**
+
+## Quy tắc chạy terminal từ chat
+
+Khi chạy lệnh terminal được đề xuất từ chat, hãy tuân theo các quy tắc sau:
+
+- Chỉ chạy lệnh trong môi trường phát triển cục bộ. không cần cd vào thư mục dự án.

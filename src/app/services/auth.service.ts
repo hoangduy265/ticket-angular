@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
-import { catchError, map, tap } from 'rxjs/operators';
+import { BehaviorSubject, Observable, throwError, interval } from 'rxjs';
+import { catchError, map, tap, switchMap, filter } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 
 export interface User {
@@ -41,8 +41,14 @@ export class AuthService {
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
 
+  // Auto refresh configuration
+  private readonly TOKEN_REFRESH_BUFFER = 20 * 60 * 1000; // Refresh 20 phút trước khi hết hạn
+  private readonly CHECK_INTERVAL = 5 * 60 * 1000; // Kiểm tra mỗi 5 phút
+  private refreshTimerSubscription: any = null;
+
   constructor(private http: HttpClient) {
     this.loadUserFromStorage();
+    this.startAutoRefreshTimer();
   }
 
   // Đăng nhập
@@ -51,7 +57,9 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials).pipe(
       tap((response) => {
         if (response.success && response.user && response.token) {
+          localStorage.setItem('Name', response.user.name || '');
           this.setSession(response);
+          this.startAutoRefreshTimer(); // Khởi động auto refresh sau khi login
         }
       }),
       catchError(this.handleError)
@@ -127,6 +135,7 @@ export class AuthService {
       localStorage.setItem('access_token', authResult.token);
       localStorage.setItem('refresh_token', authResult.refresh_token || '');
       localStorage.setItem('token_expiry', authResult.expires || '');
+      localStorage.setItem('current_user', JSON.stringify(authResult.user));
       this.currentUserSubject.next(authResult.user);
     }
   }
@@ -135,14 +144,104 @@ export class AuthService {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('token_expiry');
+    localStorage.removeItem('current_user');
     this.currentUserSubject.next(null);
+    this.stopAutoRefreshTimer();
   }
 
   private loadUserFromStorage(): void {
     if (this.isLoggedIn()) {
-      // Có thể load user info từ token hoặc gọi API
-      // this.getCurrentUser().subscribe(user => this.currentUserSubject.next(user));
+      const userJson = localStorage.getItem('current_user');
+      if (userJson) {
+        try {
+          const user = JSON.parse(userJson) as User;
+          this.currentUserSubject.next(user);
+        } catch (error) {
+          console.error('Error parsing user from localStorage:', error);
+          this.clearSession();
+        }
+      } else {
+        // Nếu không có user trong localStorage nhưng có token, gọi API để lấy user info
+        this.getCurrentUser().subscribe({
+          next: (user) => {
+            localStorage.setItem('current_user', JSON.stringify(user));
+            this.currentUserSubject.next(user);
+          },
+          error: (error) => {
+            console.error('Error loading user:', error);
+            this.clearSession();
+          },
+        });
+      }
     }
+  }
+
+  /**
+   * Bắt đầu timer tự động refresh token
+   */
+  private startAutoRefreshTimer(): void {
+    // Dừng timer cũ nếu có
+    this.stopAutoRefreshTimer();
+
+    // Chỉ chạy timer nếu đã đăng nhập
+    if (!this.isLoggedIn()) {
+      return;
+    }
+
+    console.log('🔄 Auto refresh timer started');
+
+    // Kiểm tra và refresh token định kỳ
+    this.refreshTimerSubscription = interval(this.CHECK_INTERVAL)
+      .pipe(
+        filter(() => this.isLoggedIn()),
+        switchMap(() => {
+          const shouldRefresh = this.shouldRefreshToken();
+          console.log('⏰ Token check:', { shouldRefresh, expiry: this.getTokenExpiry() });
+
+          if (shouldRefresh) {
+            console.log('🔄 Auto refreshing token...');
+            return this.refreshToken();
+          }
+          return [];
+        })
+      )
+      .subscribe({
+        next: (response) => {
+          if (response) {
+            console.log('✅ Token auto-refreshed successfully');
+          }
+        },
+        error: (error) => {
+          console.error('❌ Auto refresh token failed:', error);
+          this.clearSession();
+        },
+      });
+  }
+
+  /**
+   * Dừng timer tự động refresh token
+   */
+  private stopAutoRefreshTimer(): void {
+    if (this.refreshTimerSubscription) {
+      this.refreshTimerSubscription.unsubscribe();
+      this.refreshTimerSubscription = null;
+      console.log('⏹️ Auto refresh timer stopped');
+    }
+  }
+
+  /**
+   * Kiểm tra xem có nên refresh token không
+   */
+  private shouldRefreshToken(): boolean {
+    const expiry = this.getTokenExpiry();
+    if (!expiry) return false;
+
+    const expiryTime = new Date(expiry).getTime();
+    const currentTime = new Date().getTime();
+    const timeUntilExpiry = expiryTime - currentTime;
+
+    // Refresh nếu token sắp hết hạn (trong vòng TOKEN_REFRESH_BUFFER)
+    return timeUntilExpiry > 0 && timeUntilExpiry <= this.TOKEN_REFRESH_BUFFER;
   }
 
   private handleError(error: HttpErrorResponse): Observable<never> {

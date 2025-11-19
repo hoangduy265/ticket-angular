@@ -41,3 +41,15 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# secret files
+.env
+/environments/
+.env.*.local
+/secret/
+/credentials.json
+/firebase-debug.log
+firebase-errors.log
+secret/
+/serviceAccountKey.json
+

@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { AuthGuard } from './guards/auth.guard';
 import { LoginGuard } from './guards/login.guard';
+import { Contact } from './pages/contact/contact';
+import { News } from './pages/news/news';
 
 export const routes: Routes = [
   {
@@ -19,6 +21,18 @@ export const routes: Routes = [
       {
         path: 'home',
         loadComponent: () => import('./pages/home/home').then((m) => m.Home),
+      },
+      {
+        path: 'contact',
+        loadComponent: () => {
+          return import('./pages/contact/contact').then((m) => m.Contact);
+        },
+      },
+      {
+        path: 'news',
+        loadComponent: () => {
+          return import('./pages/news/news').then((m) => m.News);
+        },
       },
       {
         path: '',
