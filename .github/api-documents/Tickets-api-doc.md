@@ -122,7 +122,7 @@ API quản lý tickets (phiếu yêu cầu) trong hệ thống RoyalAPI với c�
   "description": "string (required, 1-1000 chars)",
   "status": 0,
   "type": "int? (optional)",
-  "slaType": "string? (optional)", 
+  "slaType": "string? (optional)",
   "note": "string? (optional, max 255 chars)",
   "createdBy": "int (required, >0)",
   "closedAt": "datetime? (optional)",
@@ -379,6 +379,7 @@ API quản lý tickets (phiếu yêu cầu) trong hệ thống RoyalAPI với c�
       "processByName": null,
       "rate": 5,
       "rateAt": "2025-11-12T14:30:00Z",
+      "isActive": true
     }
   ],
   "currentPage": 1,

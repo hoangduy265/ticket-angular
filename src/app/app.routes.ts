@@ -35,6 +35,12 @@ export const routes: Routes = [
         },
       },
       {
+        path: 'role-asigned',
+        loadComponent: () => {
+          return import('./pages/role-asigned/role-asigned').then((m) => m.RoleAsigned);
+        },
+      },
+      {
         path: '',
         redirectTo: '/home',
         pathMatch: 'full',

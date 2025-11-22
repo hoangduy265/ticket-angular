@@ -19,9 +19,10 @@ export class MainPageLayout implements OnInit {
   breadcrumbs: Breadcrumb[] = [];
 
   private routeLabels: { [key: string]: string } = {
-    '/home': '> Trang chủ',
-    '/contact': '> Liên hệ',
-    '/news': '> Tin tức',
+    '/home': ' ⇒ Trang chủ',
+    '/contact': ' ⇒ Liên hệ',
+    '/news': ' ⇒ Tin tức',
+    '/role-asigned': ' ⇒ Cấp quyền',
   };
 
   constructor(private router: Router) {}

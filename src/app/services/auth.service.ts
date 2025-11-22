@@ -3,6 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { BehaviorSubject, Observable, throwError, interval } from 'rxjs';
 import { catchError, map, tap, switchMap, filter } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import { AuthStateService } from './auth-state.service';
 
 export interface User {
   id: number;
@@ -46,19 +47,19 @@ export class AuthService {
   private readonly CHECK_INTERVAL = 5 * 60 * 1000; // Kiểm tra mỗi 5 phút
   private refreshTimerSubscription: any = null;
 
-  constructor(private http: HttpClient) {
+  constructor(private http: HttpClient, private authStateService: AuthStateService) {
     this.loadUserFromStorage();
     this.startAutoRefreshTimer();
   }
 
   // Đăng nhập
   login(credentials: { username: string; password: string }): Observable<AuthResponse> {
-    debugger;
     return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials).pipe(
       tap((response) => {
         if (response.success && response.user && response.token) {
           localStorage.setItem('Name', response.user.name || '');
           this.setSession(response);
+          this.authStateService.resetLogoutFlag(); // Reset flag khi đăng nhập thành công
           this.startAutoRefreshTimer(); // Khởi động auto refresh sau khi login
         }
       }),
@@ -86,10 +87,39 @@ export class AuthService {
   // Đăng xuất
   logout(refreshToken?: string): Observable<any> {
     const token = refreshToken || this.getRefreshToken();
-    return this.http.post(`${this.API_URL}/logout`, { refreshToken: token }).pipe(
-      tap(() => this.clearSession()),
-      catchError(this.handleError)
-    );
+
+    // Nếu không có refresh token, chỉ clear session local
+    if (!token) {
+      this.clearSession();
+      return new Observable((observer) => {
+        observer.next({ success: true, message: 'Logged out locally' });
+        observer.complete();
+      });
+    }
+
+    // Gọi API logout nhưng không để interceptor can thiệp
+    return this.http
+      .post(
+        `${this.API_URL}/logout`,
+        { refreshToken: token },
+        {
+          headers: {
+            'Skip-Interceptor': 'true', // Flag để interceptor bỏ qua
+          },
+        }
+      )
+      .pipe(
+        tap(() => this.clearSession()),
+        catchError((error) => {
+          // Nếu API logout thất bại, vẫn clear session local
+          console.warn('Logout API failed, clearing session locally:', error);
+          this.clearSession();
+          return new Observable((observer) => {
+            observer.next({ success: false, message: 'Logged out locally due to API error' });
+            observer.complete();
+          });
+        })
+      );
   }
 
   // Lấy thông tin user hiện tại
@@ -161,17 +191,24 @@ export class AuthService {
           this.clearSession();
         }
       } else {
-        // Nếu không có user trong localStorage nhưng có token, gọi API để lấy user info
-        this.getCurrentUser().subscribe({
-          next: (user) => {
-            localStorage.setItem('current_user', JSON.stringify(user));
-            this.currentUserSubject.next(user);
-          },
-          error: (error) => {
-            console.error('Error loading user:', error);
-            this.clearSession();
-          },
-        });
+        // Chỉ gọi API nếu token còn hạn (tránh gọi API với token hết hạn)
+        const expiry = this.getTokenExpiry();
+        if (expiry && new Date(expiry) > new Date()) {
+          this.getCurrentUser().subscribe({
+            next: (user) => {
+              localStorage.setItem('current_user', JSON.stringify(user));
+              this.currentUserSubject.next(user);
+            },
+            error: (error) => {
+              console.error('Error loading user:', error);
+              this.clearSession();
+            },
+          });
+        } else {
+          // Token hết hạn, clear session
+          console.warn('Token expired during load, clearing session');
+          this.clearSession();
+        }
       }
     }
   }

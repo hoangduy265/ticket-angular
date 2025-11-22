@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -12,7 +12,7 @@ import { environment } from '../../../environments/environment';
   templateUrl: './login.html',
   styleUrl: './login.css',
 })
-export class Login {
+export class Login implements OnInit {
   loginForm: FormGroup;
   isLoading = false;
   showPassword = false;
@@ -26,9 +26,13 @@ export class Login {
     this.loginForm = this.fb.group({
       // username: ['', [Validators.required, Validators.minLength(3)]],
       // password: ['', [Validators.required, Validators.minLength(6)]],
-      username: 'HUNGN',
-      password: 'Abc@123',
+      username: '',
+      password: '',
     });
+  }
+
+  ngOnInit(): void {
+    this.checkLocalStorage();
   }
 
   onSubmit(): void {
@@ -77,5 +81,23 @@ export class Login {
       } phải có ít nhất ${minLength} ký tự`;
     }
     return '';
+  }
+
+  //Check localstorage for saved username, token and token expiration
+
+  checkLocalStorage(): void {
+    const savedUsername = localStorage.getItem(localStorage.getItem('setCurrentUser') || '');
+    const savedToken = localStorage.getItem(localStorage.getItem('token') || '');
+    const tokenExpiry = localStorage.getItem(localStorage.getItem('expires') || '');
+    const resfreshToken = localStorage.getItem(localStorage.getItem('refreshToken') || '');
+    const refreshTokenExpires = localStorage.getItem(
+      localStorage.getItem('refreshTokenExpires') || ''
+    );
+    // console.log('Check Local Storage:');
+    // console.log('Saved Username:', savedUsername);
+    // console.log('Saved Token:', savedToken);
+    // console.log('Token Expiry:', tokenExpiry);
+    // console.log('Refresh Token:', resfreshToken);
+    // console.log('Refresh Token Expiry:', refreshTokenExpires);
   }
 }

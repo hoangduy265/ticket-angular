@@ -27,7 +27,7 @@
                 </label>
                 <textarea
                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    id="description" rows="4" formControlName="description" placeholder="Nhập mô tả chi tiết về ticket"
+                    id="description" rows="4" formControlName="description" placeholder="Nhập mô tả chi tiết lỗi mà bạn gặp phải!"
                     [class.border-red-500]="description?.invalid && description?.touched"
                     [class.focus\:ring-red-500]="description?.invalid && description?.touched"
                     [class.focus\:border-red-500]="description?.invalid && description?.touched">
@@ -43,16 +43,22 @@
             <!-- Type Field -->
             <div class="col-span-1 md:col-span-1">
                 <label for="type" class="block text-sm font-medium text-gray-700 mb-1">
-                    Loại ticket
+                    Loại ticket <span class="text-red-500">*</span>
                 </label>
                 <select
                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    id="type" formControlName="type">
+                    id="type" formControlName="type"
+                    [class.border-red-500]="type?.invalid && type?.touched"
+                    [class.focus\:ring-red-500]="type?.invalid && type?.touched"
+                    [class.focus\:border-red-500]="type?.invalid && type?.touched">
                     <option [value]="null">-- Chọn loại --</option>
                     <option *ngFor="let option of typeOptions" [value]="option.value">
                         {{ option.label }}
                     </option>
                 </select>
+                <div class="mt-1 text-sm text-red-600" *ngIf="type?.invalid && type?.touched">
+                    Vui lòng chọn loại ticket
+                </div>
             </div>
 
             <!-- Note Field -->
@@ -62,7 +68,7 @@
                 </label>
                 <textarea
                     class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    id="note" rows="3" formControlName="note" placeholder="Ví dụ: ID và Pass Ultraview"
+                    id="note" rows="3" formControlName="note" placeholder="Ví dụ: ID và Pass Ultraview để IT hỗ trợ"
                     [class.border-red-500]="note?.invalid && note?.touched"
                     [class.focus\:ring-red-500]="note?.invalid && note?.touched"
                     [class.focus\:border-red-500]="note?.invalid && note?.touched">

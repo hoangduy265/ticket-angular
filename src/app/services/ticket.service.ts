@@ -269,8 +269,6 @@ export class TicketService {
 
   /* Lấy danh sách hình ảnh của ticket * API doc: GET /Ticket/{ticketId}/Images*/
   getTicketImages(ticketId: number): Observable<TicketImage[]> {
-    console.log('🖼️ getTicketImages called with ticketId:', ticketId);
-
     if (!ticketId || ticketId <= 0) {
       const error = new Error('Invalid ticketId');
       console.error('❌ Invalid ticketId:', ticketId);
@@ -278,9 +276,7 @@ export class TicketService {
     }
 
     return this.http.get<TicketImage[]>(`${this.API_URL}/${ticketId}/Images`).pipe(
-      tap((images) => {
-        console.log('✅ Ticket images loaded:', images);
-      }),
+      tap((images) => {}),
       catchError((error) => {
         console.error('❌ Failed to load ticket images:', error);
         return throwError(() => error);
@@ -294,7 +290,6 @@ export class TicketService {
       tap((response) => {
         // Nếu tạo ticket thành công, gửi thông báo Telegram
         if (response.id != 0) {
-          console.log('✅ Ticket created successfully, sending Telegram notification...');
           // Gửi thông báo Telegram
           this.notificationService
             .sendTelegram({

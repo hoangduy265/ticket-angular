@@ -9,6 +9,7 @@ import {
 import { Observable, throwError, BehaviorSubject } from 'rxjs';
 import { catchError, switchMap, filter, take } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
+import { AuthStateService } from '../services/auth-state.service';
 import { Router } from '@angular/router';
 
 // State để quản lý refresh token process
@@ -23,18 +24,36 @@ export const authInterceptor: HttpInterceptorFn = (
   next: HttpHandlerFn
 ): Observable<HttpEvent<unknown>> => {
   const authService = inject(AuthService);
+  const authStateService = inject(AuthStateService);
   const router = inject(Router);
 
-  // Thêm token vào request nếu có
+  // Bỏ qua interceptor nếu có header Skip-Interceptor
+  if (req.headers.has('Skip-Interceptor')) {
+    const modifiedReq = req.clone({
+      headers: req.headers.delete('Skip-Interceptor'),
+    });
+    return next(modifiedReq);
+  }
+
+  // Skip thêm token cho các endpoint không cần auth
+  const skipAuthUrls = ['/authen/login', '/authen/register', '/authen/forgot-password'];
+  const shouldSkipAuth = skipAuthUrls.some((url) => req.url.includes(url));
+
+  // Thêm token vào request nếu có và không phải skip auth
   const token = authService.getToken();
-  if (token) {
+  if (token && !shouldSkipAuth) {
     req = addToken(req, token);
   }
 
   return next(req).pipe(
     catchError((error: HttpErrorResponse) => {
+      // Skip xử lý 401 cho các endpoint không cần auth
+      if (error.status === 401 && shouldSkipAuth) {
+        return throwError(() => error);
+      }
+
       if (error.status === 401) {
-        return handle401Error(req, next, authService, router);
+        return handle401Error(req, next, authService, authStateService, router);
       }
       return throwError(() => error);
     })
@@ -59,8 +78,14 @@ function handle401Error(
   request: HttpRequest<unknown>,
   next: HttpHandlerFn,
   authService: AuthService,
+  authStateService: AuthStateService,
   router: Router
 ): Observable<HttpEvent<unknown>> {
+  // Nếu đã logout rồi, không xử lý nữa
+  if (authStateService.isLoggedOutFlag()) {
+    return throwError(() => new Error('Session expired'));
+  }
+
   if (!isRefreshing) {
     isRefreshing = true;
     refreshTokenSubject.next(null);
@@ -75,8 +100,22 @@ function handle401Error(
       catchError((err) => {
         isRefreshing = false;
         refreshTokenSubject.next(null);
-        authService.logout();
-        router.navigate(['/login']);
+
+        // Chỉ logout một lần
+        if (!authStateService.isLoggedOutFlag()) {
+          authStateService.setLoggedOut(true);
+          console.warn('Session expired, logging out...');
+          authService.logout().subscribe({
+            next: () => {
+              console.log('Logged out successfully');
+            },
+            error: (logoutError) => {
+              console.error('Logout error:', logoutError);
+            },
+          });
+          router.navigate(['/login']);
+        }
+
         return throwError(() => err);
       })
     );

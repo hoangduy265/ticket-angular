@@ -49,11 +49,12 @@ export class SecurityService {
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https: blob:",
       "connect-src 'self' https://firestore.googleapis.com https://www.google-analytics.com https://www.google.com https://api.hoangduy.info",
-      "frame-src 'self' https://www.google.com https://www.recaptcha.net",
+      "frame-src 'self' https://www.google.com https://www.recaptcha.net https://www.youtube.com https://www.youtube-nocookie.com",
+      "child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "frame-ancestors 'none'",
+      "frame-ancestors 'self'",
     ].join('; ');
 
     // Thêm CSP header via meta tag

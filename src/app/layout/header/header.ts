@@ -40,7 +40,6 @@ export class Header implements OnInit {
       },
       error: (error) => {
         this.toastService.showError('Có lỗi xảy ra khi đăng xuất!');
-        console.error('Logout error:', error);
       },
     });
   }

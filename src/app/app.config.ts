@@ -17,6 +17,14 @@ import { FirebaseSecurityService } from './services/firebase/firebase-security.s
 import { SecurityService } from './services/security.service';
 import { GlobalErrorHandler } from './services/global-error-handler.service';
 
+// Kiểm tra hỗ trợ Firebase Messaging
+const isFirebaseMessagingSupported = () => {
+  return typeof window !== 'undefined' &&
+         'serviceWorker' in navigator &&
+         'PushManager' in window &&
+         'Notification' in window;
+};
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -25,7 +33,8 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([authInterceptor])),
     // Firebase providers sử dụng config từ environment
     provideFirebaseApp(() => initializeApp(environment.firebase.fallback)),
-    provideMessaging(() => getMessaging()),
+    // Chỉ khởi tạo Firebase Messaging nếu browser hỗ trợ
+    ...(isFirebaseMessagingSupported() ? [provideMessaging(() => getMessaging())] : []),
     // Security services
     {
       provide: ErrorHandler,

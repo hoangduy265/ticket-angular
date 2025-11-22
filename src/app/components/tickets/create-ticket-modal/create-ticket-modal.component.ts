@@ -66,7 +66,7 @@ export class CreateTicketModalComponent implements OnChanges, OnDestroy {
       title: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(200)]],
       description: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(1000)]],
       status: [0, [Validators.required, Validators.min(0), Validators.max(3)]],
-      type: [null],
+      type: [null, [Validators.required]],
       note: ['', [Validators.maxLength(255)]],
       assignedTo: [null],
       isActive: [true], // Mặc định là hoạt động

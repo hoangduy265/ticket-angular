@@ -66,7 +66,7 @@ export class EditTicketModalComponent implements OnInit, OnDestroy, OnChanges {
     this.ticketForm = this.fb.group({
       title: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(200)]],
       description: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(1000)]],
-      type: [null],
+      type: [null, [Validators.required]],
       note: ['', [Validators.maxLength(255)]],
       assignedTo: [null],
       isActive: [true],

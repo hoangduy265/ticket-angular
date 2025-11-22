@@ -25,7 +25,15 @@ export const environment = {
       projectId: 'royalnotify-2cb90',
       messagingSenderId: '774104407237',
       appId: '1:774104407237:web:211e6d555bca356c5824ac',
-    }
+    },
+  },
+  // cofig telegram bot - email
+  telegramBot: {
+    chatId: '-4638641219',
+  },
+
+  EmailBot: {
+    email: 'duyhq@royalgroup.vn',
   },
 
   // App Check settings

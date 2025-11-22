@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, Injector } from '@angular/core';
 import { Messaging, getToken, onMessage, isSupported } from '@angular/fire/messaging';
 import { BehaviorSubject } from 'rxjs';
 import { ToastService } from '../../components/toast/toast.service';
@@ -16,13 +16,29 @@ export class FirebaseFCMService {
   public token$ = this.tokenSubject.asObservable();
   public message$ = this.messageSubject.asObservable();
 
+  private messaging: Messaging | null = null;
+  private injector = inject(Injector);
+
   constructor(
-    private messaging: Messaging,
     private toastService: ToastService,
     private firebaseConfigService: FirebaseConfigService,
     private securityService: SecurityService,
     private deviceTokenService: DeviceTokenService
-  ) {}
+  ) {
+    // Lazy inject Messaging chỉ khi được hỗ trợ
+    this.initializeMessaging();
+  }
+
+  private async initializeMessaging(): Promise<void> {
+    try {
+      const supported = await this.isSupported();
+      if (supported) {
+        this.messaging = this.injector.get(Messaging);
+      }
+    } catch (error) {
+      console.warn('Firebase Messaging không khả dụng:', error);
+    }
+  }
 
   /**
    * Lấy VAPID key từ Firebase Console (cần thiết lập riêng)
@@ -54,28 +70,28 @@ export class FirebaseFCMService {
    * Đăng ký service worker Firebase
    */
   private async registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
-    console.log('>>> registerServiceWorker() called');
+    // console.log('>>> registerServiceWorker() called');
 
     if (!('serviceWorker' in navigator)) {
       console.warn('Service Worker không được hỗ trợ');
       return null;
     }
 
-    console.log('>>> Service Worker is supported');
+    // console.log('>>> Service Worker is supported');
 
     try {
       // Kiểm tra xem đã có service worker Firebase chưa
-      console.log('>>> Getting existing registrations...');
+      // console.log('>>> Getting existing registrations...');
       const registrations = await navigator.serviceWorker.getRegistrations();
-      console.log('>>> Found registrations:', registrations.length);
+      // console.log('>>> Found registrations:', registrations.length);
 
-      registrations.forEach((reg, index) => {
-        console.log(`>>> Registration ${index}:`, {
-          scope: reg.scope,
-          activeURL: reg.active?.scriptURL,
-          state: reg.active?.state,
-        });
-      });
+      // registrations.forEach((reg, index) => {
+      //   console.log(`>>> Registration ${index}:`, {
+      //     scope: reg.scope,
+      //     activeURL: reg.active?.scriptURL,
+      //     state: reg.active?.state,
+      //   });
+      // });
 
       const existingRegistration = registrations.find(
         (reg) =>
@@ -84,10 +100,10 @@ export class FirebaseFCMService {
       );
 
       if (existingRegistration) {
-        console.log('>>> ✅ Service Worker đã tồn tại, sử dụng lại:', existingRegistration.scope);
+        // console.log('>>> ✅ Service Worker đã tồn tại, sử dụng lại:', existingRegistration.scope);
 
         // Gửi config cho service worker đã tồn tại
-        console.log('>>> Sending config to existing worker...');
+        // console.log('>>> Sending config to existing worker...');
         await this.sendConfigToServiceWorker(existingRegistration);
 
         // Kiểm tra service worker state
@@ -229,8 +245,10 @@ export class FirebaseFCMService {
       const supported = await isSupported();
       console.log('Firebase Messaging supported:', supported);
 
-      if (!supported) {
-        console.warn('Firebase Messaging không được hỗ trợ trên trình duyệt này');
+      if (!supported || !this.messaging) {
+        console.warn(
+          'Firebase Messaging không được hỗ trợ trên trình duyệt này hoặc chưa được khởi tạo'
+        );
         return null;
       }
 
@@ -241,40 +259,41 @@ export class FirebaseFCMService {
       }
 
       // Đăng ký hoặc sử dụng lại service worker
-      console.log('>>> Calling registerServiceWorker()...');
+      // console.log('>>> Calling registerServiceWorker()...');
       const registration = await this.registerServiceWorker();
-      console.log('>>> registerServiceWorker() returned:', registration);
+      // console.log('>>> registerServiceWorker() returned:', registration);
 
       if (!registration) {
         console.error('>>> ❌ Không thể đăng ký service worker - registration is null');
         return null;
       }
 
-      console.log('>>> ✅ Registration successful:', {
-        scope: registration.scope,
-        active: registration.active?.state,
-      });
+      // console.log('>>> ✅ Registration successful:', {
+      //   scope: registration.scope,
+      //   active: registration.active?.state,
+      // });
 
       // Đợi một chút để service worker ổn định
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Lấy và validate VAPID key
       const vapidKeyValue = this.getVapidKey();
-      console.log('=== FCM Token Generation ===');
-      console.log('1. VAPID Key:', vapidKeyValue);
-      console.log('2. Service Worker Registration:', {
-        scope: registration.scope,
-        active: registration.active?.state,
-        waiting: registration.waiting?.state,
-        installing: registration.installing?.state,
-      });
+
+      // console.log('=== FCM Token Generation ===');
+      // console.log('1. VAPID Key:', vapidKeyValue);
+      // console.log('2. Service Worker Registration:', {
+      //   scope: registration.scope,
+      //   active: registration.active?.state,
+      //   waiting: registration.waiting?.state,
+      //   installing: registration.installing?.state,
+      // });
 
       if (!vapidKeyValue || vapidKeyValue.trim() === '') {
         console.error('VAPID key không hợp lệ hoặc chưa được cấu hình');
         return null;
       }
 
-      console.log('3. Calling getToken()...');
+      // console.log('3. Calling getToken()...');
 
       try {
         const token = await getToken(this.messaging, {
@@ -282,11 +301,11 @@ export class FirebaseFCMService {
           serviceWorkerRegistration: registration,
         });
 
-        console.log('4. getToken() result:', token ? 'SUCCESS' : 'EMPTY');
+        // console.log('4. getToken() result:', token ? 'SUCCESS' : 'EMPTY');
 
         if (token) {
-          console.log('5. ✅ Device token received:', token);
-          console.log('   Token length:', token.length);
+          // console.log('5. ✅ Device token received:', token);
+          // console.log('   Token length:', token.length);
           this.tokenSubject.next(token);
           return token;
         } else {
@@ -313,8 +332,10 @@ export class FirebaseFCMService {
   async listenForMessages(): Promise<void> {
     try {
       const supported = await isSupported();
-      if (!supported) {
-        console.warn('Firebase Messaging không được hỗ trợ - không thể lắng nghe messages');
+      if (!supported || !this.messaging) {
+        console.warn(
+          'Firebase Messaging không được hỗ trợ hoặc chưa được khởi tạo - không thể lắng nghe messages'
+        );
         return;
       }
 
@@ -370,7 +391,7 @@ export class FirebaseFCMService {
       // Gọi API để đăng ký hoặc cập nhật device token
       this.deviceTokenService.registerOrUpdateToken(userIdNumber, token, 'web').subscribe({
         next: (deviceToken) => {
-          console.log('Device token đã được đăng ký thành công:', deviceToken);
+          // console.log('Device token đã được đăng ký thành công:', deviceToken);
         },
         error: (error) => {
           console.error('Lỗi khi đăng ký device token:', error);

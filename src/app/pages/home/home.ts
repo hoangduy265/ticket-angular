@@ -204,7 +204,6 @@ export class Home implements OnInit {
     try {
       const userId = this.currentUser?.id?.toString();
       await this.fcmService.initialize(userId);
-      console.log('Firebase FCM initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Firebase FCM:', error);
     }
@@ -250,12 +249,12 @@ export class Home implements OnInit {
   // Xử lý sự kiện đánh giá ticket
   onRateTicket(ticket: Ticket): void {
     if (ticket.status !== 2) {
-      console.warn('Chỉ được đánh giá ticket đã hoàn thành');
+      this.toastService.showInfo('Chỉ được đánh giá ticket đã hoàn thành');
       return;
     }
 
     if (ticket.rate) {
-      console.warn('Ticket đã được đánh giá rồi');
+      this.toastService.showInfo('Ticket đã được đánh giá rồi');
       return;
     }
 
@@ -267,13 +266,11 @@ export class Home implements OnInit {
   private rateTicket(ticketId: number, rate: number): void {
     this.ticketService.rateTicket(ticketId, rate).subscribe({
       next: (response) => {
-        console.log('Đánh giá ticket thành công:', response);
         this.toastService.showSuccess('Đánh giá ticket thành công!');
         // Reload data để cập nhật
         this.loadRecentTickets();
       },
       error: (error) => {
-        console.error('Lỗi khi đánh giá ticket:', error);
         this.toastService.showError('Có lỗi xảy ra khi đánh giá ticket. Vui lòng thử lại!');
       },
     });
@@ -324,7 +321,6 @@ export class Home implements OnInit {
   private changeTicketStatus(ticketId: number, status: number): void {
     this.ticketService.changeTicketStatus(ticketId, status).subscribe({
       next: (response: { message: string }) => {
-        console.log('Thay đổi trạng thái ticket thành công:', response);
         this.toastService.showSuccess('Thay đổi trạng thái ticket thành công!');
         // Reload data để cập nhật
         this.loadRecentTickets();
@@ -560,14 +556,14 @@ export class Home implements OnInit {
   getTypeClass(type?: number): string {
     if (!type) return 'bg-gray-100 text-gray-800';
     const typeClasses: { [key: number]: string } = {
-      1: 'bg-red-100 text-red-800',        // Phần cứng - Đỏ
-      2: 'bg-blue-100 text-blue-800',       // Phần mềm - Xanh dương
-      3: 'bg-purple-100 text-purple-800',   // Mạng - Tím
-      4: 'bg-green-100 text-green-800',     // Camera Chấm công - Xanh lá
-      5: 'bg-yellow-100 text-yellow-800',   // Máy in - Vàng
-      6: 'bg-pink-100 text-pink-800',       // PM văn phòng - Hồng
-      7: 'bg-indigo-100 text-indigo-800',   // PM thiết kế - Chàm
-      8: 'bg-gray-100 text-gray-800',       // Khác - Xám
+      1: 'bg-red-100 text-red-800', // Phần cứng - Đỏ
+      2: 'bg-blue-100 text-blue-800', // Phần mềm - Xanh dương
+      3: 'bg-purple-100 text-purple-800', // Mạng - Tím
+      4: 'bg-green-100 text-green-800', // Camera Chấm công - Xanh lá
+      5: 'bg-yellow-100 text-yellow-800', // Máy in - Vàng
+      6: 'bg-pink-100 text-pink-800', // PM văn phòng - Hồng
+      7: 'bg-indigo-100 text-indigo-800', // PM thiết kế - Chàm
+      8: 'bg-gray-100 text-gray-800', // Khác - Xám
     };
     return typeClasses[type] || 'bg-gray-100 text-gray-800';
   }
