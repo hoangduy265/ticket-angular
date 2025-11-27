@@ -62,19 +62,32 @@ export class FirebaseConfigService {
   }
 
   /**
-   * Lấy VAPID key từ Firebase Console (cần thiết lập riêng)
+   * Lấy VAPID key từ server-side API (bảo mật hơn)
    */
-  getVapidKey(): string {
-    // VAPID key từ Firebase Console
-    // Project Settings > Cloud Messaging > Web Push certificates > Generate key pair
-    const vapidKey =
-      'BPg7VENzsCSYBhqhd3PxXSksFjnLiYPPbv_hgP7G8maUlcwYnNmRsJaCrC-iD2-5T2fwNIIXOJaawoBWHwkegqI';
+  async getVapidKey(): Promise<string> {
+    // Ưu tiên load từ server-side API
+    if (environment.firebase.useApiEndpoint) {
+      try {
+        const response = await fetch(`${environment.apiUrl}/firebase/vapid-key`);
+        if (response.ok) {
+          const data = await response.json();
+          return data.vapidKey;
+        }
+        console.warn('Không thể load VAPID key từ API, sử dụng fallback');
+      } catch (error) {
+        console.warn('Lỗi khi load VAPID key từ API:', error);
+      }
+    }
 
-    if (!vapidKey || vapidKey.trim() === '') {
-      console.error('VAPID key chưa được cấu hình trong FirebaseConfigService');
+    // Fallback: VAPID key từ Firebase Console (chỉ dùng trong development)
+    // ⚠️ SECURITY: Không nên commit VAPID key vào source code
+    const fallbackVapidKey = 'BPg7VENzsCSYBhqhd3PxXSksFjnLiYPPbv_hgP7G8maUlcwYnNmRsJaCrC-iD2-5T2fwNIIXOJaawoBWHwkegqI';
+
+    if (!fallbackVapidKey || fallbackVapidKey.trim() === '') {
+      console.error('VAPID key chưa được cấu hình');
       throw new Error('VAPID key is not configured');
     }
 
-    return vapidKey;
+    return fallbackVapidKey;
   }
 }

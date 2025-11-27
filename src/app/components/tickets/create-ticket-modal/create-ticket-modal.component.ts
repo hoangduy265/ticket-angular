@@ -175,13 +175,13 @@ export class CreateTicketModalComponent implements OnChanges, OnDestroy {
    * Tạo ticket và upload hình ảnh theo thứ tự tuần tự
    */
   private createTicketAndUploadImages(formData: any, userId: number): void {
-    console.log('🚀 Starting createTicketAndUploadImages with:', {
-      formData,
-      userId,
-      hasFiles: this.selectedFiles.length > 0,
-      fileCount: this.selectedFiles.length,
-      fileNames: this.selectedFiles.map((f) => f.name),
-    });
+    // console.log('🚀 Starting createTicketAndUploadImages with:', {
+    //   formData,
+    //   userId,
+    //   hasFiles: this.selectedFiles.length > 0,
+    //   fileCount: this.selectedFiles.length,
+    //   fileNames: this.selectedFiles.map((f) => f.name),
+    // });
 
     // Chuẩn bị request body với các field cần thiết
     const requestBody = {
@@ -191,20 +191,20 @@ export class CreateTicketModalComponent implements OnChanges, OnDestroy {
       type: formData.type || null,
       note: formData.note || null,
       createdBy: userId,
-      slaType: 'B', // Mặc định: SLA Type B (2 giờ)
+      slaType: 'A', // Mặc định: SLA Type A (1 giờ)
       isActive: true, // Mặc định: hoạt động
     };
 
-    console.log('📝 Request body:', requestBody);
+    // console.log('📝 Request body:', requestBody);
 
     // Bước 1: Tạo ticket và nhận ID
-    console.log('📝 Step 1: Creating ticket...');
+    // console.log('📝 Step 1: Creating ticket...');
     this.ticketService
       .createTicketReturnId(requestBody)
       .pipe(
         delay(2000),
         tap((createResponse) => {
-          console.log('✅ Create ticket API response:', createResponse);
+          // console.log('✅ Create ticket API response:', createResponse);
         }),
         catchError((createError) => {
           console.error('❌ Lỗi khi tạo ticket:', createError);
@@ -232,7 +232,7 @@ export class CreateTicketModalComponent implements OnChanges, OnDestroy {
             return;
           }
 
-          console.log('✅ Ticket created successfully with ID:', ticketId);
+          // console.log('✅ Ticket created successfully with ID:', ticketId);
 
           // Bước 2: Upload nhiều ảnh (nếu có)
           if (this.selectedFiles.length > 0) {
@@ -269,7 +269,9 @@ export class CreateTicketModalComponent implements OnChanges, OnDestroy {
       }
 
       const file = this.selectedFiles[index];
-      console.log(`🖼️  Uploading image ${index + 1}/${totalFiles}: ${file.name}`);
+      // console.log(
+      //   `🖼️  Uploading image ${index + 1}/${totalFiles}: ${file.name}, size: ${file.size}`
+      // );
 
       this.ticketService
         .uploadImageToTicket(file, userId, ticketId)
@@ -278,7 +280,7 @@ export class CreateTicketModalComponent implements OnChanges, OnDestroy {
           next: (uploadResponse) => {
             uploadedCount++;
             uploadedFiles.push(uploadResponse.uploadedFile);
-            console.log(`✅ Upload ${index + 1}/${totalFiles} successful`);
+            // console.log(`✅ Upload ${index + 1}/${totalFiles} successful, file: ${file.name}`);
             uploadNext(index + 1);
           },
           error: (uploadError) => {
@@ -410,6 +412,62 @@ export class CreateTicketModalComponent implements OnChanges, OnDestroy {
     if (fileInput) {
       fileInput.value = '';
     }
+  }
+
+  /**
+   * Chụp ảnh từ camera trên thiết bị mobile
+   */
+  takePicture(): void {
+    // Kiểm tra đã đạt giới hạn ảnh chưa
+    if (this.selectedFiles.length >= this.maxImages) {
+      this.toastService.showWarning(`Đã đạt giới hạn ${this.maxImages} ảnh!`);
+      return;
+    }
+
+    // Tạo input element ẩn để trigger camera
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment'; // Sử dụng camera sau (environment) hoặc 'user' cho camera trước
+
+    input.onchange = (event: any) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+
+      // Kiểm tra file type
+      if (!file.type.startsWith('image/')) {
+        this.toastService.showError('File không phải là hình ảnh!');
+        return;
+      }
+
+      // Kiểm tra file size (max 5MB)
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        this.toastService.showError('Ảnh vượt quá 5MB!');
+        return;
+      }
+
+      // Thêm file vào danh sách
+      this.selectedFiles.push(file);
+
+      // Tạo preview
+      const reader = new FileReader();
+      reader.onload = (e: any) => {
+        this.imagePreviews.push({
+          file: file,
+          url: e.target.result,
+          name: file.name || 'Camera-' + new Date().getTime() + '.jpg',
+        });
+      };
+      reader.readAsDataURL(file);
+
+      this.toastService.showSuccess('✅ Đã thêm ảnh!');
+    };
+
+    // Trigger click để mở camera
+    input.click();
   }
 
   ngOnDestroy(): void {

@@ -233,9 +233,24 @@ export class TicketService {
       return throwError(() => error);
     }
 
-    // Prepare FormData - chỉ chứa file
+    // Tạo tên file duy nhất: [userId]_[ticketId]_[timestamp]_[random].[ext]
+    const ext = file.name.split('.').pop() || 'jpg';
+    const uniqueName = `${userId}_${ticketId}_${Date.now()}_${Math.floor(
+      Math.random() * 10000
+    )}.${ext}`;
+
     const formData = new FormData();
-    formData.append('file', file, file.name);
+    formData.append('file', file, uniqueName);
+
+    // Log FormData content để debug
+    console.log('📦 FormData contents:');
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        console.log(`  ${key}: File(${value.name}, ${value.size} bytes, ${value.type})`);
+      } else {
+        console.log(`  ${key}: ${value}`);
+      }
+    }
 
     // userId và ticketId được gửi qua query params
     const params = new HttpParams()
@@ -243,7 +258,9 @@ export class TicketService {
       .set('ticketId', ticketId.toString());
 
     console.log('📦 Request details:', {
-      file: file.name,
+      originalFileName: file.name,
+      uniqueFileName: uniqueName,
+      fileSize: file.size,
       queryParams: { userId, ticketId },
       url: `${this.API_URL}/UploadImageTicket?userId=${userId}&ticketId=${ticketId}`,
     });
@@ -319,11 +336,28 @@ export class TicketService {
               console.log('✅ Email notification sent:', res.message);
             },
             error: (err) => {
-              debugger;
               console.error('❌ Failed to send Email notification:', err);
               // Không throw error để không ảnh hưởng đến việc tạo ticket
             },
           });
+
+          // Gửi FCM notification đến IT Department
+          console.log('🏢 Starting FCM notification to IT Department...');
+          const creatorName = localStorage.getItem('Name') || 'User';
+          this.notificationService
+            .SendNotifyFCMToITDepartment(response.id, ticket.title, creatorName)
+            .subscribe({
+              next: (res) => {
+                console.log('✅ FCM notification to IT Department sent:', res.message);
+                if (res.errors && res.errors.length > 0) {
+                  console.warn('⚠️ FCM notification warnings:', res.errors);
+                }
+              },
+              error: (err) => {
+                console.error('❌ Failed to send FCM notification to IT Department:', err);
+                // Không throw error để không ảnh hưởng đến việc tạo ticket
+              },
+            });
         }
       })
     );

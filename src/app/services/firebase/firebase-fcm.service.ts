@@ -27,6 +27,8 @@ export class FirebaseFCMService {
   ) {
     // Lazy inject Messaging chỉ khi được hỗ trợ
     this.initializeMessaging();
+    // Setup service worker update handling
+    this.setupServiceWorkerUpdateHandling();
   }
 
   private async initializeMessaging(): Promise<void> {
@@ -41,10 +43,24 @@ export class FirebaseFCMService {
   }
 
   /**
-   * Lấy VAPID key từ Firebase Console (cần thiết lập riêng)
+   * Setup service worker update handling để đảm bảo background notifications hoạt động
    */
-  private getVapidKey(): string {
-    return this.firebaseConfigService.getVapidKey();
+  private setupServiceWorkerUpdateHandling(): void {
+    if (!('serviceWorker' in navigator)) {
+      return;
+    }
+
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      // Reload page để đảm bảo service worker mới hoạt động
+      window.location.reload();
+    });
+  }
+
+  /**
+   * Lấy VAPID key từ Firebase Config Service
+   */
+  private async getVapidKey(): Promise<string> {
+    return await this.firebaseConfigService.getVapidKey();
   }
 
   /**
@@ -107,20 +123,18 @@ export class FirebaseFCMService {
         await this.sendConfigToServiceWorker(existingRegistration);
 
         // Kiểm tra service worker state
-        console.log('>>> Service worker state:', {
-          active: existingRegistration.active?.state,
-          waiting: existingRegistration.waiting?.state,
-          installing: existingRegistration.installing?.state,
-        });
+        // console.log('>>> Service worker state:', {
+        //   active: existingRegistration.active?.state,
+        //   waiting: existingRegistration.waiting?.state,
+        //   installing: existingRegistration.installing?.state,
+        // });
 
         // Nếu service worker đã active, không cần đợi ready nữa
         if (existingRegistration.active?.state === 'activated') {
-          console.log('>>> Service worker đã sẵn sàng (already activated)');
           return existingRegistration;
         }
 
         // Chỉ đợi ready nếu chưa active
-        console.log('>>> Waiting for service worker ready...');
         try {
           await Promise.race([
             navigator.serviceWorker.ready,
@@ -128,7 +142,6 @@ export class FirebaseFCMService {
               setTimeout(() => reject(new Error('Service worker ready timeout')), 5000)
             ),
           ]);
-          console.log('>>> Service worker is ready');
         } catch (error) {
           console.warn('>>> Service worker ready timeout, continuing anyway...', error);
         }
@@ -137,19 +150,12 @@ export class FirebaseFCMService {
       }
 
       // Nếu chưa có, đăng ký mới
-      console.log('>>> 🆕 Đăng ký Service Worker mới...');
       const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
         scope: '/firebase-cloud-messaging-push-scope',
       });
 
-      console.log('>>> Service Worker đã đăng ký thành công:', registration.scope);
-
       // Đợi service worker ready
-      console.log('>>> Waiting for new service worker ready...');
       const readyRegistration = await navigator.serviceWorker.ready;
-      console.log('>>> Service Worker đã sẵn sàng');
-
-      console.log('>>> Sending config to new worker...');
       await this.sendConfigToServiceWorker(readyRegistration);
       await this.sendConfigToServiceWorker(registration);
 
@@ -243,7 +249,17 @@ export class FirebaseFCMService {
     try {
       // Kiểm tra hỗ trợ Firebase Messaging
       const supported = await isSupported();
-      console.log('Firebase Messaging supported:', supported);
+      // console.log('Firebase Messaging supported:', supported);
+
+      const userAgent = navigator.userAgent;
+      const isEdge = /Edg\//.test(userAgent);
+      const isChrome = /Chrome\//.test(userAgent) && !isEdge;
+      const isSafari = /Safari\//.test(userAgent) && !isChrome && !isEdge;
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        userAgent
+      );
+      const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+      const isAndroid = /Android/.test(userAgent);
 
       if (!supported || !this.messaging) {
         console.warn(
@@ -277,7 +293,7 @@ export class FirebaseFCMService {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       // Lấy và validate VAPID key
-      const vapidKeyValue = this.getVapidKey();
+      const vapidKeyValue = await this.getVapidKey();
 
       // console.log('=== FCM Token Generation ===');
       // console.log('1. VAPID Key:', vapidKeyValue);
@@ -307,6 +323,8 @@ export class FirebaseFCMService {
           // console.log('5. ✅ Device token received:', token);
           // console.log('   Token length:', token.length);
           this.tokenSubject.next(token);
+          localStorage.setItem('fcm_device_token', token);
+          localStorage.setItem('fcm_token_platform', isIOS ? 'ios' : isAndroid ? 'android' : 'web');
           return token;
         } else {
           console.warn('5. ❌ Không thể lấy device token - getToken returned empty');
@@ -327,7 +345,49 @@ export class FirebaseFCMService {
   }
 
   /**
-   * Lắng nghe thông báo khi ứng dụng đang mở
+   * Lắng nghe messages từ Service Worker (background notifications)
+   */
+  setupServiceWorkerMessageListener(): void {
+    if (!('serviceWorker' in navigator)) {
+      console.warn('[FirebaseFCM] Service Worker not supported');
+      return;
+    }
+
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      const data = event.data || {};
+
+      if (data.type === 'BACKGROUND_MESSAGE_RECEIVED') {
+        debugger;
+        // console.log('[FirebaseFCM] Background message received from SW:', data.payload);
+
+        const payload = data.payload;
+        let toastTitle = 'Thông báo';
+        let toastMessage = '';
+
+        if (payload.notification) {
+          toastTitle = payload.notification.title || 'Thông báo';
+          toastMessage = payload.notification.body || '';
+        } else if (payload.data) {
+          toastTitle = payload.data['title'] || payload.data['subject'] || 'Thông báo mới';
+          toastMessage =
+            payload.data['body'] ||
+            payload.data['message'] ||
+            payload.data['content'] ||
+            'Bạn có thông báo mới';
+        }
+
+        // Hiển thị toast KHÔNG tự động đóng (duration = 0)
+        if (toastMessage || toastTitle !== 'Thông báo') {
+          this.toastService.showInfo(`${toastTitle}: ${toastMessage}`, 0);
+        }
+      }
+    });
+
+    // console.log('[FirebaseFCM] Service Worker message listener setup complete');
+  }
+
+  /**
+   * Lắng nghe thông báo khi ứng dụng đang mở (Foreground)
    */
   async listenForMessages(): Promise<void> {
     try {
@@ -340,35 +400,53 @@ export class FirebaseFCMService {
       }
 
       onMessage(this.messaging, (payload) => {
-        console.log('Thông báo nhận được:', payload);
+        // console.log('[FirebaseFCM] Foreground message received:', payload);
 
         // Phát ra thông báo qua observable
         this.messageSubject.next(payload);
 
         // Hiển thị thông báo toast
+        let toastMessage = '';
+        let toastTitle = 'Thông báo';
+
         if (payload.notification) {
-          this.toastService.showInfo(
-            `${payload.notification.title || 'Thông báo'}: ${payload.notification.body || ''}`,
-            5000
-          );
+          // Trường hợp có notification object (thông báo hiển thị)
+          toastTitle = payload.notification.title || 'Thông báo';
+          toastMessage = payload.notification.body || '';
+        } else if (payload.data) {
+          // Trường hợp chỉ có data (thông báo data-only từ server)
+          toastTitle = payload.data['title'] || payload.data['subject'] || 'Thông báo mới';
+          toastMessage =
+            payload.data['body'] ||
+            payload.data['message'] ||
+            payload.data['content'] ||
+            'Bạn có thông báo mới';
         }
 
-        // Hiển thị notification của trình duyệt nếu cần
-        if (payload.notification && 'serviceWorker' in navigator) {
-          const notification = new Notification(payload.notification.title || 'Thông báo', {
-            body: payload.notification.body,
-            icon: payload.notification.icon,
-          });
-
-          notification.onclick = () => {
-            notification.close();
-            // Có thể thêm logic để điều hướng đến trang cụ thể
-            window.focus();
-          };
+        // Hiển thị toast KHÔNG tự động đóng (duration = 0)
+        if (toastMessage || toastTitle !== 'Thông báo') {
+          this.toastService.showInfo(`${toastTitle}: ${toastMessage}`);
+          this.playNotificationSound();
         }
+
+        // Luôn hiển thị notification của trình duyệt (popup ở góc dưới bên trái)
+        this.showBrowserNotification(payload);
       });
     } catch (error) {
       console.error('Lỗi khi lắng nghe messages:', error);
+    }
+  }
+
+  // Phát âm thanh thông báo
+  private playNotificationSound() {
+    try {
+      const audio = new Audio('/assets/sounds/notification.mp3');
+      audio.volume = 0.5;
+      audio.play().catch((err) => {
+        console.warn('Cannot play notification sound:', err);
+      });
+    } catch (error) {
+      console.warn('Notification sound error:', error);
     }
   }
 
@@ -440,6 +518,9 @@ export class FirebaseFCMService {
    */
   async initialize(userId?: string): Promise<void> {
     try {
+      // Setup listener cho background messages từ Service Worker
+      this.setupServiceWorkerMessageListener();
+
       const token = await this.getDeviceToken();
       if (token) {
         await this.registerDeviceToken(token, userId);
@@ -448,6 +529,72 @@ export class FirebaseFCMService {
     } catch (error) {
       console.error('Lỗi khi khởi tạo FCM:', error);
     }
+  }
+
+  /**
+   * Hiển thị notification của trình duyệt (popup ở góc dưới bên trái)
+   */
+  private showBrowserNotification(payload: any): void {
+    if (!('Notification' in window)) {
+      console.warn('Trình duyệt không hỗ trợ Notification API');
+      return;
+    }
+
+    if (Notification.permission !== 'granted') {
+      console.warn('Không có quyền hiển thị notification');
+      return;
+    }
+
+    // Tạo nội dung notification từ payload
+    let title = 'Thông báo';
+    let body = '';
+    let icon = '/assets/logo.png'; // Default icon
+    let data = {};
+
+    if (payload.notification) {
+      title = payload.notification.title || 'Thông báo';
+      body = payload.notification.body || '';
+      icon = payload.notification.icon || icon;
+    } else if (payload.data) {
+      title = payload.data['title'] || payload.data['subject'] || 'Thông báo mới';
+      body =
+        payload.data['body'] ||
+        payload.data['message'] ||
+        payload.data['content'] ||
+        'Bạn có thông báo mới';
+      data = payload.data;
+    }
+
+    // Tạo notification với các tùy chọn để xuất hiện trong Windows Action Center
+    const notificationOptions: NotificationOptions = {
+      body: body,
+      icon: icon,
+      badge: icon,
+      tag: payload.notification?.tag || payload.data?.['tag'] || 'firebase-notification',
+      data: {
+        url: payload.data?.['url'] || '/',
+        ...data,
+      },
+      requireInteraction: true, // Yêu cầu user tương tác để đóng
+      silent: false, // Có âm thanh
+    };
+
+    // Hiển thị notification
+    const notification = new Notification(title, notificationOptions);
+
+    // Xử lý sự kiện click vào notification
+    notification.onclick = () => {
+      notification.close();
+      // Focus vào cửa sổ ứng dụng
+      window.focus();
+      // Có thể thêm logic để điều hướng đến trang cụ thể dựa trên data
+      console.log('Notification clicked with data:', data);
+    };
+
+    // Không tự động đóng để notification tồn tại trong Action Center
+    // setTimeout(() => {
+    //   notification.close();
+    // }, 5000);
   }
 
   /**

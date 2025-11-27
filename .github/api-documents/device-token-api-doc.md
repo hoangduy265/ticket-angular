@@ -97,9 +97,13 @@
 
 ## 4. Vô hiệu hóa device token
 
-- **URL**: `/api/DeviceTokens/{id}`
-- **Method**: `DELETE`
+- **URL**: `/api/DeviceTokens/deactivate`
+- **Method**: `PUT`
 - **Headers**: `Authorization: Bearer <token>`
+- **Query Params**:
+- `deviceToken` (bắt buộc): Chuỗi token của thiết bị cần vô hiệu hóa
+- `platform` (tùy chọn): Nền tảng thiết bị (android, ios, ...)
+
 - **Response 200**:
 
 ```json
@@ -109,4 +113,11 @@
 }
 ```
 
-- **Response 404**: Không tìm thấy device token.
+- **Response 404**:
+
+```json
+{
+    "success": false,
+    "message": "Không tìm thấy device token"
+}
+```

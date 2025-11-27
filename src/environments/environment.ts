@@ -40,6 +40,10 @@ export const environment = {
     email: 'duyhq@royalgroup.vn',
   },
 
+  FCMFirebase_Department: {
+    DepartmentId: '2',
+  },
+
   // App Check settings
   appCheck: {
     enabled: false, // Disabled in development

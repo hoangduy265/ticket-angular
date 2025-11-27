@@ -22,16 +22,52 @@ const initializeFirebase = (config) => {
     firebaseMessagingInstance.onBackgroundMessage((payload) => {
       console.log('[Firebase SW] Received background message', payload);
 
-      const notificationTitle = payload.notification?.title || 'Thông báo';
+      const notificationTitle =
+        payload.notification?.title || payload.data?.title || 'Thông báo mới';
+      const notificationBody =
+        payload.notification?.body ||
+        payload.data?.body ||
+        payload.data?.message ||
+        'Bạn có thông báo mới';
+      const notificationIcon = payload.notification?.icon || '/assets/logo.png';
+
+      alert('FCM Background Message Received:\n' + notificationTitle + '\n' + notificationBody);
+
       const notificationOptions = {
-        body: payload.notification?.body || '',
-        icon: payload.notification?.icon || '/assets/icons/icon-192x192.png',
-        badge: payload.notification?.icon || '/assets/icons/icon-192x192.png',
-        tag: payload.notification?.tag || 'notification',
-        data: payload.data || {},
+        body: notificationBody,
+        icon: notificationIcon,
+        badge: notificationIcon,
+        tag: payload.notification?.tag || payload.data?.tag || 'firebase-notification',
+        data: {
+          url: payload.data?.url || '/',
+          ...payload.data,
+        },
+        requireInteraction: true, // Yêu cầu user tương tác để đóng
+        silent: false, // Có âm thanh
+        actions: [
+          {
+            action: 'view',
+            title: 'Xem',
+            icon: '/assets/logo.png',
+          },
+          {
+            action: 'close',
+            title: 'Đóng',
+          },
+        ],
       };
 
       self.registration.showNotification(notificationTitle, notificationOptions);
+
+      // Gửi message về client để track
+      self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({
+            type: 'BACKGROUND_MESSAGE_RECEIVED',
+            payload: payload,
+          });
+        });
+      });
     });
   } catch (error) {
     firebaseInitialized = false;
@@ -66,10 +102,28 @@ self.addEventListener('message', (event) => {
 
 // Xử lý click vào notification
 self.addEventListener('notificationclick', (event) => {
-  console.log('Notification click received.');
+  console.log('Notification click received:', event);
 
   event.notification.close();
 
-  // Điều hướng đến trang cụ thể khi click vào notification
-  event.waitUntil(clients.openWindow(event.notification.data?.url || '/'));
+  const action = event.action;
+  const notificationData = event.notification.data || {};
+
+  if (action === 'view') {
+    // Mở trang cụ thể
+    const urlToOpen = notificationData.url || '/';
+    event.waitUntil(clients.openWindow(urlToOpen));
+  } else if (action === 'close') {
+    // Chỉ đóng notification
+    return;
+  } else {
+    // Click vào notification body (mặc định action)
+    const urlToOpen = notificationData.url || '/';
+    event.waitUntil(clients.openWindow(urlToOpen));
+  }
+});
+
+// Xử lý notification close
+self.addEventListener('notificationclose', (event) => {
+  console.log('Notification closed:', event);
 });

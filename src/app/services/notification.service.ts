@@ -1,8 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, forkJoin, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
-import { object } from '@angular/fire/database';
+import { UserService, User } from './user.service';
+import { DeviceTokenService, DeviceToken } from './device-token.service';
 
 // Request/Response Interfaces
 export interface SendEmailRequest {
@@ -19,7 +21,7 @@ export interface SendTelegramRequest {
 }
 
 export interface SendFCMRequest {
-  deviceToken: string;
+  token: string; // Backend API expects 'token' not 'deviceToken'
   title: string;
   body: string;
   data?: { [key: string]: string };
@@ -38,16 +40,17 @@ export interface NotificationResponse {
 export class NotificationService {
   private readonly API_URL = environment.apiUrl + '/NotifySend';
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private userService: UserService,
+    private deviceTokenService: DeviceTokenService
+  ) {}
 
   /**
    * Gửi email thông báo
    * API doc: POST /NotifySend/SendEmail
    */
   sendEmail(request: SendEmailRequest): Observable<NotificationResponse> {
-    console.log('📧 Sending email - Full request object:', request);
-    console.log('📧 Request stringified:', JSON.stringify(request));
-
     // API expects direct object: { toEmail, subject, message, isHtml }
     return this.http.post<NotificationResponse>(`${this.API_URL}/SendEmail`, request);
   }
@@ -57,8 +60,6 @@ export class NotificationService {
    * API doc: POST /NotifySend/SendTelegram
    */
   sendTelegram(request: SendTelegramRequest): Observable<NotificationResponse> {
-    console.log('📱 Sending Telegram message:', { chatId: request.chatId });
-
     return this.http.post<NotificationResponse>(`${this.API_URL}/SendTelegram`, request);
   }
 
@@ -67,8 +68,6 @@ export class NotificationService {
    * API doc: POST /NotifySend/SendFCM
    */
   sendFCM(request: SendFCMRequest): Observable<NotificationResponse> {
-    console.log('🔔 Sending FCM notification:', { title: request.title });
-
     return this.http.post<NotificationResponse>(`${this.API_URL}/SendFCM`, request);
   }
 
@@ -98,7 +97,7 @@ export class NotificationService {
         <!-- Header -->
         <tr>
           <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
-            <h1 style="color: #ffffff; font-size: 24px; margin: 0;">🎫 Thông báo Ticket mới</h1>
+            <h1 style="color: #ffffff; font-size: 32px; margin: 0;">🎫 Thông báo Ticket mới</h1>
             <p style="color: #ffffff; font-size: 14px; margin: 8px 0 0 0; opacity: 0.9;">Có ticket mới cần được xử lý</p>
           </td>
         </tr>
@@ -235,7 +234,7 @@ Vui lòng kiểm tra hệ thống để xem chi tiết.
     ticketTitle: string
   ): Observable<NotificationResponse> {
     const request: SendFCMRequest = {
-      deviceToken: deviceToken,
+      token: deviceToken, // Backend API expects 'token'
       title: 'Ticket mới',
       body: `#${ticketId}: ${ticketTitle}`,
       data: {
@@ -254,19 +253,142 @@ Vui lòng kiểm tra hệ thống để xem chi tiết.
   sendTicketStatusChangeFCM(
     deviceToken: string,
     ticketId: number,
+    ticketTitle: string,
     newStatus: string
   ): Observable<NotificationResponse> {
     const request: SendFCMRequest = {
-      deviceToken: deviceToken,
-      title: 'Cập nhật trạng thái Ticket',
-      body: `Ticket #${ticketId} đã chuyển sang: ${newStatus}`,
+      token: deviceToken, // Backend API expects 'token'
+      title: `Ticket #${ticketId} Trạng thái cập nhật`,
+      body: `Ticket ${ticketTitle} đã chuyển sang: ${newStatus}`,
       data: {
         ticketId: ticketId.toString(),
         type: 'status_change',
         status: newStatus,
       },
     };
-
+    console.log('🔔 Sending ticket status change FCM notification');
     return this.sendFCM(request);
+  }
+
+  /**
+   * Gửi FCM notification đến tất cả user trong IT Department khi có ticket mới
+   * Sử dụng environment.FCMFirebase_Department.DepartmentId để xác định phòng IT
+   */
+  SendNotifyFCMToITDepartment(
+    ticketId: number,
+    ticketTitle: string,
+    creatorName: string
+  ): Observable<NotificationResponse> {
+    const departmentId = environment.FCMFirebase_Department?.DepartmentId;
+    if (!departmentId) {
+      console.error(
+        '❌ [NotificationService] FCMFirebase_Department.DepartmentId not configured in environment'
+      );
+      return of({
+        success: false,
+        message: 'IT Department ID not configured',
+        errors: ['FCMFirebase_Department.DepartmentId is missing in environment configuration'],
+      });
+    }
+
+    // Lấy danh sách user IT
+    return this.userService.getUsersByDepartment(parseInt(departmentId, 10)).pipe(
+      switchMap((users: User[]) => {
+        if (users.length === 0) {
+          console.warn('⚠️ [NotificationService] No users found in IT department');
+          return of({
+            success: true,
+            message: 'No users in IT department',
+            errors: ['No users found'],
+          });
+        }
+
+        // Lấy device tokens cho từng user từ bảng DeviceTokens
+        const tokenObservables = users.map((user) =>
+          this.deviceTokenService.getDeviceTokensByUser(user.id).pipe(
+            map((tokens: DeviceToken[]) => ({
+              user,
+              tokens: tokens.filter((t) => t.isActive && t.deviceToken), // Lọc token active
+            })),
+            catchError((error) => {
+              console.warn(`⚠️ Failed to get tokens for user ${user.id}:`, error);
+              return of({ user, tokens: [] as DeviceToken[] });
+            })
+          )
+        );
+
+        return forkJoin(tokenObservables).pipe(
+          switchMap((userTokenPairs) => {
+            // Flatten to get all active tokens with user info
+            const allTokens = userTokenPairs.flatMap((pair) =>
+              pair.tokens.map((token) => ({
+                deviceToken: token.deviceToken,
+                platform: token.platform,
+                user: pair.user,
+              }))
+            );
+
+            if (allTokens.length === 0) {
+              console.warn('⚠️ [NotificationService] No active device tokens found');
+              return of({
+                success: true,
+                message: 'No active device tokens found',
+                errors: ['No tokens available'],
+              });
+            }
+
+            // Gửi FCM đến từng token
+            const fcmObservables = allTokens.map(({ deviceToken, platform, user }) => {
+              const fcmRequest: SendFCMRequest = {
+                token: deviceToken, // Backend API expects 'token'
+                title: `🎫 Ticket mới từ ${creatorName}`,
+                body: `Ticket #${ticketId}: ${ticketTitle}`,
+                data: {
+                  ticketId: ticketId.toString(),
+                  type: 'new_ticket',
+                  creatorName: creatorName,
+                  userName: user.name,
+                  userEmail: user.email || '',
+                  department: user.departmentName || 'IT',
+                  platform: platform,
+                },
+              };
+
+              return this.sendFCM(fcmRequest).pipe(
+                map((response) => ({ success: response.success, user: user.name, platform })),
+                catchError((error) => {
+                  console.error(`❌ Failed to send FCM to ${user.name} (${platform}):`, error);
+                  return of({ success: false, user: user.name, platform });
+                })
+              );
+            });
+
+            return forkJoin(fcmObservables).pipe(
+              map((results) => {
+                const successCount = results.filter((r) => r.success).length;
+                const failedCount = results.length - successCount;
+                const errors = results
+                  .filter((r) => !r.success)
+                  .map((r) => `Failed to send to ${r.user} (${r.platform})`);
+
+                return {
+                  success: successCount > 0,
+                  message: `Sent FCM to ${successCount}/${results.length} devices`,
+                  errors: errors.length > 0 ? errors : undefined,
+                };
+              })
+            );
+          })
+        );
+      }),
+      catchError((error) => {
+        console.error('❌ [NotificationService] Error in SendNotifyFCMToITDepartment:', error);
+        return of({
+          success: false,
+          message: 'Failed to send FCM notifications',
+          errors: [error.message || 'Unknown error'],
+        });
+      })
+    );
   }
 }

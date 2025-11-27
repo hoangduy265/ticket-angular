@@ -4,6 +4,7 @@ import { BehaviorSubject, Observable, throwError, interval } from 'rxjs';
 import { catchError, map, tap, switchMap, filter } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
 import { AuthStateService } from './auth-state.service';
+import { DeviceTokenService } from './device-token.service';
 
 export interface User {
   id: number;
@@ -47,7 +48,11 @@ export class AuthService {
   private readonly CHECK_INTERVAL = 5 * 60 * 1000; // Kiểm tra mỗi 5 phút
   private refreshTimerSubscription: any = null;
 
-  constructor(private http: HttpClient, private authStateService: AuthStateService) {
+  constructor(
+    private http: HttpClient,
+    private authStateService: AuthStateService,
+    private deviceTokenService: DeviceTokenService
+  ) {
     this.loadUserFromStorage();
     this.startAutoRefreshTimer();
   }
@@ -97,29 +102,43 @@ export class AuthService {
       });
     }
 
-    // Gọi API logout nhưng không để interceptor can thiệp
-    return this.http
-      .post(
-        `${this.API_URL}/logout`,
-        { refreshToken: token },
-        {
-          headers: {
-            'Skip-Interceptor': 'true', // Flag để interceptor bỏ qua
-          },
-        }
-      )
-      .pipe(
-        tap(() => this.clearSession()),
-        catchError((error) => {
-          // Nếu API logout thất bại, vẫn clear session local
-          console.warn('Logout API failed, clearing session locally:', error);
-          this.clearSession();
-          return new Observable((observer) => {
-            observer.next({ success: false, message: 'Logged out locally due to API error' });
-            observer.complete();
+    // Gọi API logout, để interceptor tự động thêm Authorization
+    return this.http.post(`${this.API_URL}/logout`, { refreshToken: token }).pipe(
+      tap(() => {
+        console.log('Logging out: unregistering device token');
+        // Chỉ xóa device token của thiết bị hiện tại
+        debugger;
+        const deviceToken = localStorage.getItem('fcm_device_token');
+        const platform = localStorage.getItem('fcm_token_platform') || 'web';
+        console.log('Unregistering device token on logout:', { deviceToken, platform });
+        if (deviceToken) {
+          this.deviceTokenService.deactiveteDeviceToken(deviceToken, platform).subscribe({
+            next: (success: boolean) => {
+              if (success) {
+                console.log('Device token unregistered successfully');
+              } else {
+                console.warn('Device token unregister failed');
+              }
+            },
+            error: (error: any) => {
+              console.error('Error unregistering device token:', error);
+            },
           });
-        })
-      );
+        }
+        this.clearSession();
+      }),
+      catchError((error) => {
+        // Nếu API logout thất bại, vẫn clear session local
+        console.warn('Logout API failed, clearing session locally:', error);
+        this.clearSession();
+        return new Observable((observer) => {
+          observer.next({ success: false, message: 'Logged out locally due to API error' });
+          observer.complete();
+        });
+      })
+    );
+    // ...existing code...
+    // Lưu ý: DeviceTokenService cần có phương thức getCurrentDeviceToken() trả về deviceToken và platform của thiết bị hiện tại
   }
 
   // Lấy thông tin user hiện tại

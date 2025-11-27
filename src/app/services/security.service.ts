@@ -48,7 +48,7 @@ export class SecurityService {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https: blob:",
-      "connect-src 'self' https://firestore.googleapis.com https://www.google-analytics.com https://www.google.com https://api.hoangduy.info",
+      "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebaseinstallations.googleapis.com https://*.firebaseapp.com wss://*.firebaseio.com https://firestore.googleapis.com https://www.google-analytics.com https://www.google.com https://api.hoangduy.info",
       "frame-src 'self' https://www.google.com https://www.recaptcha.net https://www.youtube.com https://www.youtube-nocookie.com",
       "child-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
       "object-src 'none'",

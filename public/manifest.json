@@ -1,0 +1,37 @@
+{
+  "name": "ROYAL Portal",
+  "short_name": "ROYAL Portal",
+  "description": "Portal quản lý dịch vụ của ROYAL IT",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007bff",
+  "scope": "/",
+  "orientation": "portrait-primary",
+  "categories": ["business", "productivity"],
+  "lang": "vi-VN",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/assets/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tạo Ticket Mới",
+      "short_name": "Tạo Ticket",
+      "description": "Tạo ticket mới",
+      "url": "/?action=create-ticket",
+      "icons": [{ "src": "/assets/logo.png", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -92,14 +92,18 @@ export class Home implements OnInit {
     // Subscribe để nhận update khi user thay đổi
     this.authService.currentUser$.subscribe((user) => {
       this.currentUser = user;
+      // Initialize Firebase FCM khi user được load
+      if (user?.id) {
+        this.initializeFCM();
+      } else if (user === null) {
+        // Unregister device token khi user logout
+        this.unregisterFCM();
+      }
     });
 
     // Load ticket data
     this.loadTicketStats();
     this.loadRecentTickets();
-
-    // Initialize Firebase FCM for push notifications
-    this.initializeFCM();
   }
 
   // Load currentUser từ localStorage
@@ -209,6 +213,21 @@ export class Home implements OnInit {
     }
   }
 
+  // Unregister Firebase Cloud Messaging khi user logout
+  private async unregisterFCM(): Promise<void> {
+    try {
+      const userId =
+        this.currentUser?.id?.toString() || localStorage.getItem('current_user')
+          ? JSON.parse(localStorage.getItem('current_user')!).id?.toString()
+          : null;
+      if (userId) {
+        await this.fcmService.unregisterDeviceToken(userId);
+      }
+    } catch (error) {
+      console.error('Failed to unregister Firebase FCM:', error);
+    }
+  }
+
   // Pagination methods
   previousPage(): void {
     if (this.currentPage > 1) {
@@ -301,7 +320,7 @@ export class Home implements OnInit {
     }
 
     // TODO: Implement update logic - mở modal cập nhật hoặc navigate đến trang edit
-    console.log('Cập nhật ticket:', ticket);
+    // console.log('Cập nhật ticket:', ticket);
   }
 
   // Xử lý sự kiện thay đổi trạng thái ticket
@@ -312,7 +331,7 @@ export class Home implements OnInit {
     }
 
     // TODO: Có thể thêm validation logic ở đây
-    console.log('Thay đổi trạng thái ticket:', ticket.id, 'từ', ticket.status, 'thành', newStatus);
+    // console.log('Thay đổi trạng thái ticket:', ticket.id, 'từ', ticket.status, 'thành', newStatus);
 
     this.changeTicketStatus(ticket.id, newStatus);
   }
@@ -342,7 +361,7 @@ export class Home implements OnInit {
       return;
     }
 
-    console.log('Upload hình ảnh cho ticket:', ticket.id, file.name);
+    // console.log('Upload hình ảnh cho ticket:', ticket.id, file.name);
     this.uploadTicketImage(ticket.id, file, this.currentUser.id);
   }
 
@@ -350,7 +369,7 @@ export class Home implements OnInit {
   private uploadTicketImage(ticketId: number, file: File, userId: number): void {
     this.ticketService.uploadImage(file, userId).subscribe({
       next: (response: any) => {
-        console.log('Upload hình ảnh thành công:', response);
+        // console.log('Upload hình ảnh thành công:', response);
         this.toastService.showSuccess('Upload hình ảnh thành công!');
         // Có thể cập nhật ticket với đường dẫn hình ảnh mới
       },
@@ -365,7 +384,7 @@ export class Home implements OnInit {
   getTicketById(ticketId: number): void {
     this.ticketService.getTicketById(ticketId).subscribe({
       next: (ticket: Ticket) => {
-        console.log('Lấy chi tiết ticket thành công:', ticket);
+        // console.log('Lấy chi tiết ticket thành công:', ticket);
         this.toastService.showSuccess('Lấy chi tiết ticket thành công!');
         // TODO: Có thể mở modal hiển thị chi tiết hoặc navigate đến trang detail
       },
@@ -398,10 +417,6 @@ export class Home implements OnInit {
 
     this.ticketService.createTicket(newTicket).subscribe({
       next: (response: { code: number; message: string }) => {
-        console.log('Tạo ticket thành công:', response);
-        // Toast đã được hiển thị trong modal component, không cần show lại ở đây
-        // this.toastService.showSuccess('Tạo ticket thành công!');
-        // Reload data để cập nhật danh sách
         this.loadRecentTickets();
         this.loadTicketStats();
         // Đóng modal và reset form
@@ -421,7 +436,7 @@ export class Home implements OnInit {
   ): void {
     this.ticketService.updateTicket(ticketId, updateData).subscribe({
       next: (response: { message: string }) => {
-        console.log('Cập nhật ticket thành công:', response);
+        // console.log('Cập nhật ticket thành công:', response);
         this.toastService.showSuccess('Cập nhật ticket thành công!');
         // Reload data để cập nhật
         this.loadRecentTickets();
@@ -468,7 +483,7 @@ export class Home implements OnInit {
   }
 
   onTicketCreated(ticketData: any): void {
-    console.log('Ticket data received from modal:', ticketData);
+    // console.log('Ticket data received from modal:', ticketData);
     // Modal đã tự xử lý việc tạo ticket và hiển thị toast
     // Chỉ cần reload data và đóng modal
     this.loadRecentTickets();
@@ -488,7 +503,7 @@ export class Home implements OnInit {
   }
 
   onTicketUpdated(updateData: any): void {
-    console.log('Ticket update data received:', updateData);
+    // console.log('Ticket update data received:', updateData);
     // Modal đã tự xử lý việc update ticket và upload ảnh, hiển thị toast
     // Chỉ cần reload data và đóng modal
     this.loadRecentTickets();
@@ -642,5 +657,14 @@ export class Home implements OnInit {
 
   goToImage(index: number): void {
     this.currentImageIndex = index;
+  }
+
+  /**
+   * Reload lại danh sách ticket và thống kê
+   */
+  reloadTicket(): void {
+    // console.log('🔄 Reloading tickets...');
+    this.loadRecentTickets();
+    this.loadTicketStats();
   }
 }

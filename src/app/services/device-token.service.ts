@@ -100,14 +100,19 @@ export class DeviceTokenService {
   }
 
   /**
-   * Vô hiệu hóa device token
-   * @param id ID của device token
+   * Vô hiệu hóa device token của thiết bị hiện tại
+   * @param deviceToken Chuỗi token của thiết bị
+   * @param platform Nền tảng thiết bị (web, android, ios)
    * @returns Observable<boolean>
    */
-  deleteDeviceToken(id: number): Observable<boolean> {
-    return this.http.delete<DeviceTokenResponse>(`${this.API_URL}/${id}`).pipe(
+  deactiveteDeviceToken(deviceToken: string, platform?: string): Observable<boolean> {
+    let url = `${this.API_URL}/deactivate?deviceToken=${encodeURIComponent(deviceToken)}`;
+    if (platform) {
+      url += `&platform=${encodeURIComponent(platform)}`;
+    }
+    return this.http.put<DeviceTokenResponse>(url, {}).pipe(
       map((response) => {
-        return response.success;
+        return response.success === true;
       }),
       catchError(this.handleError)
     );
@@ -188,23 +193,33 @@ export class DeviceTokenService {
   }
 
   /**
-   * Vô hiệu hóa tất cả device tokens của user
+   * Vô hiệu hóa tất cả device tokens của user theo PlatForm
    * @param userId ID của user
    * @returns Observable<boolean>
    */
-  deactivateAllUserTokens(userId: number): Observable<boolean> {
+  deactivateAllUserTokens(
+    userId: number,
+    platform?: 'web' | 'android' | 'ios'
+  ): Observable<boolean> {
     return this.getDeviceTokensByUser(userId).pipe(
       map((tokens) => {
-        const activeTokens = tokens.filter((t) => t.isActive);
+        const activeTokens = tokens.filter(
+          (t) => t.isActive && (!platform || t.platform === platform)
+        );
         if (activeTokens.length === 0) {
           return true;
         }
 
-        // Vô hiệu hóa tất cả tokens
-        const deleteObservables = activeTokens.map((token) => this.deleteDeviceToken(token.id!));
+        activeTokens.forEach((token) => {
+          this.updateDeviceToken(token.id!, { isActive: false }).subscribe({
+            next: () => {},
+            error: (error) => {
+              console.error('Lỗi khi vô hiệu hóa token:', error);
+            },
+          });
+        });
 
-        // Chờ tất cả hoàn thành
-        return true; // Simplified, nên dùng forkJoin trong thực tế
+        return true;
       }),
       catchError(this.handleError)
     );

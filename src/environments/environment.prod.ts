@@ -27,13 +27,18 @@ export const environment = {
       appId: '1:774104407237:web:211e6d555bca356c5824ac',
     },
   },
+
   // cofig telegram bot - email
   telegramBot: {
     chatId: '-4638641219',
   },
 
   EmailBot: {
-    email: 'duyhq@royalgroup.vn',
+    email: 'it@royalgroup.vn',
+  },
+
+  FCMFirebase_Department: {
+    DepartmentId: '2',
   },
 
   // App Check settings

@@ -39,13 +39,17 @@ export class ToastComponent implements OnInit, OnDestroy {
       id: this.generateId(),
     };
 
-    this.toasts.push(toast);
+    // Thêm toast mới vào ĐẦU mảng (unshift) thay vì cuối (push)
+    // Toast mới sẽ hiển thị ở trên, toast cũ đẩy xuống dưới
+    this.toasts.unshift(toast);
 
-    // Auto remove after duration
-    const duration = toast.duration || 5000;
-    setTimeout(() => {
-      this.removeToast(toast.id);
-    }, duration);
+    // Auto remove after duration (chỉ khi duration > 0)
+    const duration = toast.duration || 0;
+    if (duration > 0) {
+      setTimeout(() => {
+        this.removeToast(toast.id);
+      }, duration);
+    }
   }
 
   removeToast(id: string) {
